@@ -98,7 +98,29 @@ namespace StarterAssets
         private int _animIDFreeFall;
         private int _animIDMotionSpeed;
 
-#if ENABLE_INPUT_SYSTEM 
+        // exercício
+      
+        private int _currentExercise = 0;
+        private int _exerciseCount = 2; // número de exercícios disponíveis
+
+
+        [Header("Exercise")]
+        public bool isExercising = false;
+        public bool inExerciseArea = false;
+        public float exerciseForce = 100f; // Certifique-se de que isso está definido para 100
+        public float forceDecreaseRate = 5f;
+        public float forceIncreaseRate = 10f;
+        public float minForceDecreaseRate = 5f;
+        public float maxForceDecreaseRate = 40f;
+        public float forceDecreaseAcceleration = 0.3f;
+        public float minAnimationSpeed = 0.5f;
+        private float exerciseCooldown = 0.1f;
+        private float lastExerciseTime = 0f;
+        private int _animIDIsExercising;
+        private int _animIDExerciseType;
+        private int _animIDExerciseSpeed;
+
+#if ENABLE_INPUT_SYSTEM
         private PlayerInput _playerInput;
 #endif
         private Animator _animator;
@@ -135,17 +157,27 @@ namespace StarterAssets
         private void Start()
         {
             _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
-            
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
-#if ENABLE_INPUT_SYSTEM 
+#if ENABLE_INPUT_SYSTEM
             _playerInput = GetComponent<PlayerInput>();
 #else
-			Debug.LogError( "Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it");
+            Debug.LogError("Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it");
 #endif
 
             AssignAnimationIDs();
+
+            // Inicialize as variáveis de animação de exercício
+            _animator = GetComponent<Animator>();
+            _animIDIsExercising = Animator.StringToHash("isExercising");
+            _animIDExerciseType = Animator.StringToHash("exerciseType");
+            _animIDExerciseSpeed = Animator.StringToHash("exerciseSpeed");
+
+            if (FindObjectOfType<ForceSliderController>() != null)
+            {
+                FindObjectOfType<ForceSliderController>().UpdateSliderValue(exerciseForce / 100f);
+            }
 
             // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
@@ -159,6 +191,8 @@ namespace StarterAssets
             JumpAndGravity();
             GroundedCheck();
             Move();
+            HandleExerciseInput();
+            UpdateExerciseState();
         }
 
         private void LateUpdate()
@@ -173,6 +207,9 @@ namespace StarterAssets
             _animIDJump = Animator.StringToHash("Jump");
             _animIDFreeFall = Animator.StringToHash("FreeFall");
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
+            _animIDIsExercising = Animator.StringToHash("isExercising");
+            _animIDExerciseType = Animator.StringToHash("exerciseType");
+            _animIDExerciseSpeed = Animator.StringToHash("exerciseSpeed");
         }
 
         private void GroundedCheck()
@@ -368,6 +405,80 @@ namespace StarterAssets
                 new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
                 GroundedRadius);
         }
+        private void HandleExerciseInput()
+        {
+            if (inExerciseArea && Input.GetKeyDown(KeyCode.F))
+            {
+                isExercising = !isExercising;
+                _animator.SetBool(_animIDIsExercising, isExercising);
+
+                if (isExercising)
+                {
+                    _animator.SetInteger(_animIDExerciseType, 1); // Iniciar push up
+                   
+                }
+                else
+                {
+                    _animator.SetInteger(_animIDExerciseType, 3); // Voltar para idle
+                }
+            }
+
+            if (isExercising && Input.GetKey(KeyCode.E) && Time.time - lastExerciseTime > exerciseCooldown)
+            {
+                lastExerciseTime = Time.time;
+                exerciseForce = Mathf.Min(exerciseForce + forceIncreaseRate, 100f);
+                _animator.SetInteger(_animIDExerciseType, 2); // Realizar push up
+            }
+        }
+
+        private void UpdateExerciseState()
+        {
+            if (isExercising)
+            {
+                exerciseForce = Mathf.Max(exerciseForce - forceDecreaseRate * Time.deltaTime, 0);
+                forceDecreaseRate = Mathf.Min(forceDecreaseRate + forceDecreaseAcceleration * Time.deltaTime, maxForceDecreaseRate);
+
+                float normalizedForce = exerciseForce / 100f;
+                _animator.SetFloat(_animIDExerciseSpeed, Mathf.Lerp(minAnimationSpeed, 1f, normalizedForce));
+
+                if (exerciseForce <= 0)
+                {
+                    isExercising = false;
+                    _animator.SetBool(_animIDIsExercising, false);
+                    _animator.SetInteger(_animIDExerciseType, 3); // Parar exercício
+                }
+            }
+            else
+            {
+                if (exerciseForce < 100f)
+                {
+                    exerciseForce += forceDecreaseRate * Time.deltaTime;
+                    forceDecreaseRate = Mathf.Max(forceDecreaseRate - forceDecreaseAcceleration * Time.deltaTime, minForceDecreaseRate);
+                }
+            }
+
+            // Atualiza o slider sempre que o estado do exercício muda
+            if (FindObjectOfType<ForceSliderController>() != null)
+            {
+                FindObjectOfType<ForceSliderController>().UpdateSliderValue(exerciseForce / 100f);
+            }
+        }
+        private void OnTriggerEnter(Collider other)
+        {
+            if (other.CompareTag("PushUpArea"))
+            {
+                inExerciseArea = true;
+            }
+        }
+
+        private void OnTriggerExit(Collider other)
+        {
+            if (other.CompareTag("PushUpArea"))
+            {
+                inExerciseArea = false;
+            }
+        }
+
 
         private void OnFootstep(AnimationEvent animationEvent)
         {
@@ -388,5 +499,7 @@ namespace StarterAssets
                 AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
             }
         }
+
+
     }
 }
