@@ -468,9 +468,9 @@ namespace StarterAssets
         }
 
 
-        private void UpdateExerciseState()
+       private void UpdateExerciseState()
         {
-            if (isExercising)
+            if (isExercising || backSquad)
             {
                 exerciseForce = Mathf.Max(exerciseForce - forceDecreaseRate * Time.deltaTime, 0);
                 forceDecreaseRate = Mathf.Min(forceDecreaseRate + forceDecreaseAcceleration * Time.deltaTime, maxForceDecreaseRate);
@@ -480,50 +480,18 @@ namespace StarterAssets
 
                 if (exerciseForce <= 0)
                 {
-                    isExercising = false;
-                    _animator.SetBool(_animIDIsExercising, false);
-                    if (_currentExercise == 0) // PushUp
+                    if (isExercising)
                     {
+                        isExercising = false;
+                        _animator.SetBool(_animIDIsExercising, false);
                         _animator.SetInteger(_animIDExerciseType, 3);
                     }
-                    else if (_currentExercise == 1) // BackSquat
+                    if (backSquad)
                     {
+                        backSquad = false;
+                        _animator.SetBool(_animIDBackSquad, false);
                         _animator.SetInteger(_animIDExerciseType, 6);
-                       
                     }
-                   
-                }
-            }
-            else
-            {
-                if (exerciseForce < 100f)
-                {
-                    exerciseForce += forceDecreaseRate * Time.deltaTime;
-                    forceDecreaseRate = Mathf.Max(forceDecreaseRate - forceDecreaseAcceleration * Time.deltaTime, minForceDecreaseRate);
-                }
-            }
-            if (backSquad)
-            {
-                exerciseForce = Mathf.Max(exerciseForce - forceDecreaseRate * Time.deltaTime, 0);
-                forceDecreaseRate = Mathf.Min(forceDecreaseRate + forceDecreaseAcceleration * Time.deltaTime, maxForceDecreaseRate);
-
-                float normalizedForce = exerciseForce / 100f;
-                _animator.SetFloat(_animIDExerciseSpeed, Mathf.Lerp(minAnimationSpeed, 1f, normalizedForce));
-
-                if (exerciseForce <= 0)
-                {
-                    backSquad = false;
-                    _animator.SetBool(_animIDBackSquad, false);
-                    if (_currentExercise == 0) // PushUp
-                    {
-                        _animator.SetInteger(_animIDExerciseType, 3);
-                    }
-                    else if (_currentExercise == 1) // BackSquat
-                    {
-                        _animator.SetInteger(_animIDExerciseType, 6);
-
-                    }
-
                 }
             }
             else
@@ -535,12 +503,13 @@ namespace StarterAssets
                 }
             }
 
-            // Atualiza o slider sempre que o estado do exercício muda
-            if (FindObjectOfType<ForceSliderController>() != null)
+            ForceSliderController forceSlider = FindObjectOfType<ForceSliderController>();
+            if (forceSlider != null)
             {
-                FindObjectOfType<ForceSliderController>().UpdateSliderValue(exerciseForce / 100f);
+                forceSlider.UpdateSliderValue(exerciseForce / 100f);
             }
         }
+
         private void OnTriggerEnter(Collider other)
         {
             if (other.CompareTag("PushUpArea"))
