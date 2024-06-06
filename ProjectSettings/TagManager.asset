@@ -6,6 +6,7 @@ TagManager:
   tags:
   - CinemachineTarget
   - PushUpArea
+  - BackSquatArea
   layers:
   - Default
   - TransparentFX

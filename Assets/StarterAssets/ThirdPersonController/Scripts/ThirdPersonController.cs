@@ -106,17 +106,20 @@ namespace StarterAssets
 
         [Header("Exercise")]
         public bool isExercising = false;
+        public bool backSquad = false;
         public bool inExerciseArea = false;
+        public bool inExerciseArea2 = false;
         public float exerciseForce = 100f; // Certifique-se de que isso está definido para 100
         public float forceDecreaseRate = 5f;
-        public float forceIncreaseRate = 10f;
-        public float minForceDecreaseRate = 5f;
-        public float maxForceDecreaseRate = 40f;
-        public float forceDecreaseAcceleration = 0.3f;
-        public float minAnimationSpeed = 0.5f;
+        public float forceIncreaseRate = 0.05f;
+        public float minForceDecreaseRate = 20f;
+        public float maxForceDecreaseRate = 140f;
+        public float forceDecreaseAcceleration = 1f;
+        public float minAnimationSpeed = 0.2f;
         private float exerciseCooldown = 0.1f;
         private float lastExerciseTime = 0f;
         private int _animIDIsExercising;
+        private int _animIDBackSquad;
         private int _animIDExerciseType;
         private int _animIDExerciseSpeed;
 
@@ -171,6 +174,7 @@ namespace StarterAssets
             // Inicialize as variáveis de animação de exercício
             _animator = GetComponent<Animator>();
             _animIDIsExercising = Animator.StringToHash("isExercising");
+            _animIDBackSquad = Animator.StringToHash("backSquad");
             _animIDExerciseType = Animator.StringToHash("exerciseType");
             _animIDExerciseSpeed = Animator.StringToHash("exerciseSpeed");
 
@@ -208,6 +212,7 @@ namespace StarterAssets
             _animIDFreeFall = Animator.StringToHash("FreeFall");
             _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
             _animIDIsExercising = Animator.StringToHash("isExercising");
+            _animIDBackSquad = Animator.StringToHash("backSquad");
             _animIDExerciseType = Animator.StringToHash("exerciseType");
             _animIDExerciseSpeed = Animator.StringToHash("exerciseSpeed");
         }
@@ -415,21 +420,53 @@ namespace StarterAssets
                 if (isExercising)
                 {
                     _animator.SetInteger(_animIDExerciseType, 1); // Iniciar push up
-                   
+                    _currentExercise = 0; // PushUp
+                    Debug.Log("PushUp");
                 }
                 else
                 {
                     _animator.SetInteger(_animIDExerciseType, 3); // Voltar para idle
                 }
             }
+            if (inExerciseArea2 && Input.GetKeyDown(KeyCode.F))
+            {
+                backSquad = !backSquad;
+                _animator.SetBool(_animIDBackSquad, backSquad);
 
-            if (isExercising && Input.GetKey(KeyCode.E) && Time.time - lastExerciseTime > exerciseCooldown)
+                if (backSquad)
+                {
+                    _animator.SetInteger(_animIDExerciseType, 4); // Iniciar backsquat
+                    _currentExercise = 1; // BackSquat
+                    Debug.Log("BackSquat");
+                }
+                else
+                {
+                    _animator.SetInteger(_animIDExerciseType, 6); // Voltar para idle
+                }
+            }
+
+            if (isExercising && Input.GetKey(KeyCode.E) && Time.time - lastExerciseTime > exerciseCooldown) //a fazer back squad
             {
                 lastExerciseTime = Time.time;
                 exerciseForce = Mathf.Min(exerciseForce + forceIncreaseRate, 100f);
-                _animator.SetInteger(_animIDExerciseType, 2); // Realizar push up
+                if (_currentExercise == 0) // PushUp
+                {
+                    _animator.SetInteger(_animIDExerciseType, 2); // Realizar push up
+                }
+               
+            }
+            if (backSquad && Input.GetKey(KeyCode.E) && Time.time - lastExerciseTime > exerciseCooldown) //a fazer back squad
+            {
+                lastExerciseTime = Time.time;
+                exerciseForce = Mathf.Min(exerciseForce + forceIncreaseRate, 100f);
+               
+                if (_currentExercise == 1) // BackSquat
+                {
+                    _animator.SetInteger(_animIDExerciseType, 5); // Realizar backsquat
+                }
             }
         }
+
 
         private void UpdateExerciseState()
         {
@@ -445,7 +482,48 @@ namespace StarterAssets
                 {
                     isExercising = false;
                     _animator.SetBool(_animIDIsExercising, false);
-                    _animator.SetInteger(_animIDExerciseType, 3); // Parar exercício
+                    if (_currentExercise == 0) // PushUp
+                    {
+                        _animator.SetInteger(_animIDExerciseType, 3);
+                    }
+                    else if (_currentExercise == 1) // BackSquat
+                    {
+                        _animator.SetInteger(_animIDExerciseType, 6);
+                       
+                    }
+                   
+                }
+            }
+            else
+            {
+                if (exerciseForce < 100f)
+                {
+                    exerciseForce += forceDecreaseRate * Time.deltaTime;
+                    forceDecreaseRate = Mathf.Max(forceDecreaseRate - forceDecreaseAcceleration * Time.deltaTime, minForceDecreaseRate);
+                }
+            }
+            if (backSquad)
+            {
+                exerciseForce = Mathf.Max(exerciseForce - forceDecreaseRate * Time.deltaTime, 0);
+                forceDecreaseRate = Mathf.Min(forceDecreaseRate + forceDecreaseAcceleration * Time.deltaTime, maxForceDecreaseRate);
+
+                float normalizedForce = exerciseForce / 100f;
+                _animator.SetFloat(_animIDExerciseSpeed, Mathf.Lerp(minAnimationSpeed, 1f, normalizedForce));
+
+                if (exerciseForce <= 0)
+                {
+                    backSquad = false;
+                    _animator.SetBool(_animIDBackSquad, false);
+                    if (_currentExercise == 0) // PushUp
+                    {
+                        _animator.SetInteger(_animIDExerciseType, 3);
+                    }
+                    else if (_currentExercise == 1) // BackSquat
+                    {
+                        _animator.SetInteger(_animIDExerciseType, 6);
+
+                    }
+
                 }
             }
             else
@@ -467,7 +545,15 @@ namespace StarterAssets
         {
             if (other.CompareTag("PushUpArea"))
             {
+                Debug.Log("Entered PushUpArea");
                 inExerciseArea = true;
+                _currentExercise = 0; // PushUp
+            }
+            else if (other.CompareTag("BackSquatArea"))
+            {
+                Debug.Log("Entered BackSquatArea");
+                inExerciseArea2 = true;
+                _currentExercise = 1; // BackSquat
             }
         }
 
@@ -475,7 +561,13 @@ namespace StarterAssets
         {
             if (other.CompareTag("PushUpArea"))
             {
+                Debug.Log("Exited PushUpArea");
                 inExerciseArea = false;
+            }
+            else if (other.CompareTag("BackSquatArea"))
+            {
+                Debug.Log("Exited BackSquatArea");
+                inExerciseArea2 = false;
             }
         }
 
